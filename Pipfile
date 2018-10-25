@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[[source]]
+url = "https://testpypi.python.org/pypi"
+verify_ssl = true
+name = "pypitest"
+
+[packages]
+Jinja2 = "*"
+Flask = "*"
+uWSGI = "*"
+#actingweb = {version="*", index="pypitest"}
+actingweb = "*"
+
+[dev-packages]
+pydevd = "*"
+
+[requires]
+python_version = "3.6"
