@@ -45,12 +45,6 @@ class OnAWDemo(on_aw.OnAWBase):
 
     def get_callbacks(self, name):
         """Customizible function to handle GET /callbacks"""
-        # return True if callback has been processed
-        # THE BELOW IS SAMPLE CODE
-        # my_oauth=oauth.oauth(token = myself.get_property('oauth_token').value)
-        # if name == 'something':
-        #    return
-        # END OF SAMPLE CODE
         return False
 
     def delete_callbacks(self, name):
@@ -75,7 +69,8 @@ class OnAWDemo(on_aw.OnAWBase):
         #    return True
         # req.response.set_status(403, "Callback not found.")
         # END OF SAMPLE CODE
-        return False
+        logging.debug('Got callback from google on ' + name)
+        return True
 
     def post_subscriptions(self, sub, peerid, data):
         """Customizible function to process incoming callbacks/subscriptions/ callback with json body,
@@ -93,10 +88,58 @@ class OnAWDemo(on_aw.OnAWBase):
 
     def check_on_oauth_success(self, token=None):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE AND BEFORE APPROVAL
+        profile = self.auth.oauth_get('https://www.googleapis.com/gmail/v1/users/me/profile')
+        if not profile or self.myself.creator != profile.get('emailAddress'):
+            return False
+        self.myself.set_property('email', self.myself.creator)
+        self.myself.set_property('messagesTotal', str(profile.get('messagesTotal')))
+        self.myself.set_property('threadsTotal', str(profile.get('threadsTotal')))
+        self.myself.set_property('historyId', str(profile.get('historyId')))
         return True
 
     def actions_on_oauth_success(self):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE
+        # Format is projects/{project}/topics/{topic}
+        # Create new Google pub/sub topic
+        name = 'projects/proud-structure-220107/topics/mail-' + self.myself.id
+        res = self.auth.oauth_put('https://pubsub.googleapis.com/v1/' + name)
+        if not res and not self.auth.oauth.last_response_code == 409:
+            logging.warning('Not able to create Google pub/sub topic ' + name)
+            return False
+        sub = 'projects/proud-structure-220107/subscriptions/mail-' + self.myself.id
+        # New subscriptiom
+        params = {
+          "topic": name,
+          "pushConfig": {
+            "pushEndpoint": self.config.root + self.myself.id + '/callbacks/messages'
+          },
+          "ackDeadlineSeconds": 10,
+          "retainAckedMessages": False
+        }
+        res = self.auth.oauth_put('https://pubsub.googleapis.com/v1/' + sub, params=params)
+        if not res and not self.auth.oauth.last_response_code == 409:
+            logging.warning('Not able to create Google pub/sub subscription ' + sub)
+            return False
+        # Allow gmail to publish to the topic
+        params = {
+          "policy": {
+            "bindings": [{
+              "role": "roles/pubsub.publisher",
+              "members": ["serviceAccount:gmail-api-push@system.gserviceaccount.com"],
+            }],
+          }
+        }
+        res = self.auth.oauth_post('https://pubsub.googleapis.com/v1/' + name + ':setIamPolicy', params=params)
+        if not res and not self.auth.oauth.last_response_code == 409:
+            logging.warning('Not able to add gmail publish permission on ' + name)
+            return False
+        params = {
+          "topicName": name
+        }
+        res = self.auth.oauth_post('https://www.googleapis.com/gmail/v1/users/me/watch', params=params)
+        if not res and not self.auth.oauth.last_response_code == 409:
+            logging.warning('Not able to create gmail watch')
+            return False
         return True
 
     def get_resources(self, name):

@@ -4,8 +4,7 @@ import json
 import logging
 from urllib.parse import urlparse
 from flask import Flask, request, redirect, Response, render_template
-from actingweb import config
-from actingweb import aw_web_request
+from actingweb import config, aw_web_request, actor
 import on_aw
 from actingweb.handlers import callbacks, properties, meta, root, trust, devtest, \
     subscription, resources, oauth, callback_oauth, bot, www, factory
@@ -32,12 +31,18 @@ def get_config():
         'client_id': os.getenv('APP_OAUTH_ID', ""),
         'client_secret': os.getenv('APP_OAUTH_KEY', ""),
         'redirect_uri': proto + myurl + "/oauth",
-        'scope': "https://mail.google.com/",
+        'scope': "https://mail.google.com/ https://www.googleapis.com/auth/pubsub",
         'auth_uri': "https://accounts.google.com/o/oauth2/v2/auth",
         'token_uri': "https://www.googleapis.com/oauth2/v4/token",
         'response_type': "code",
         'grant_type': "authorization_code",
         'refresh_type': "refresh_token",
+        'oauth_extras': {
+            'access_type': 'offline',
+            'include_granted_scopes': 'true',
+            'login_hint': 'dynamic:creator',
+            'prompt': 'consent'
+        }
     }
     actors = {
         'myself': {
@@ -223,6 +228,8 @@ class Handler:
                 self.handler.put(**kwargs)
         except AttributeError:
             return False
+        if self.get_status() == 404:
+            return False
         return True
 
     def get_redirect(self):
@@ -254,6 +261,11 @@ def app_root():
     h = Handler(request)
     if not h.process():
         return Response(status=404)
+    if h.get_status() == 400:
+            existing = actor.Actor(config=get_config())
+            existing.get_from_property('email', request.values.get('creator'))
+            if existing.id:
+                return redirect(get_config().root + existing.id, 302)
     if request.method == 'GET':
         return render_template('aw-root-factory.html', **h.webobj.response.template_values)
     return h.get_response()
@@ -397,20 +409,9 @@ def app_oauth_callback():
     return h.get_response()
 
 
-class FixScriptName:
-    def __init__(self, app):
-        self.app = app
-
-    def __call__(self, environ, start_response):
-        SCRIPT_NAME = os.getenv('APP_PATH_PREFIX', '')
-
-        if environ['PATH_INFO'].startswith(SCRIPT_NAME):
-            environ['PATH_INFO'] = environ['PATH_INFO'][len(SCRIPT_NAME):]
-            environ['SCRIPT_NAME'] = SCRIPT_NAME
-            return self.app(environ, start_response)
-        else:
-            start_response('404', [('Content-Type', 'text/plain')])
-            return ["Not found".encode()]
+@app.route('/google91d73b3ba8074162.html', methods=['GET'], strict_slashes=False)
+def app_google_verify():
+    return Response("google-site-verification: google91d73b3ba8074162.html")
 
 
 if __name__ == "__main__":
