@@ -5,7 +5,7 @@ import logging
 from urllib.parse import urlparse
 from flask import Flask, request, redirect, Response, render_template
 from actingweb import config, aw_web_request, actor
-import on_aw
+from src import on_aw
 from actingweb.handlers import callbacks, properties, meta, root, trust, devtest, \
     subscription, resources, oauth, callback_oauth, bot, www, factory
 

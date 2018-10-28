@@ -1,6 +1,7 @@
 import logging
 import json
 from actingweb import on_aw
+from src import gmail
 
 
 class OnAWDemo(on_aw.OnAWBase):
@@ -54,22 +55,12 @@ class OnAWDemo(on_aw.OnAWBase):
 
     def post_callbacks(self, name):
         """Customizible function to handle POST /callbacks"""
-        # return True if callback has been processed
-        # THE BELOW IS SAMPLE CODE
-        # logging.debug("Callback body: "+req.request.body.decode('utf-8', 'ignore'))
-        # non-json POSTs to be handled first
-        # if name == 'somethingelse':
-        #    return True
-        # Handle json POSTs below
-        # body = json.loads(req.request.body.decode('utf-8', 'ignore'))
-        # data = body['data']
-        # if name == 'somethingmore':
-        #    callback_id = req.request.get('id')
-        #    req.response.set_status(204)
-        #    return True
-        # req.response.set_status(403, "Callback not found.")
-        # END OF SAMPLE CODE
-        logging.debug('Got callback from google on ' + name)
+        gm = gmail.GMail(self.myself, self.config, self.auth)
+        try:
+            h = gm.process_callback(json.loads(self.webobj.request.body.decode('utf-8')))
+        except json.JSONDecodeError:
+            return False
+        logging.debug(json.dumps(h, indent=4))
         return True
 
     def post_subscriptions(self, sub, peerid, data):
@@ -84,63 +75,22 @@ class OnAWDemo(on_aw.OnAWBase):
         # THE BELOW IS SAMPLE CODE
         # Clean up anything associated with this actor before it is deleted.
         # END OF SAMPLE CODE
+        gm = gmail.GMail(self.myself, self.config, self.auth)
+        gm.cleanup()
         return
 
     def check_on_oauth_success(self, token=None):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE AND BEFORE APPROVAL
-        profile = self.auth.oauth_get('https://www.googleapis.com/gmail/v1/users/me/profile')
-        if not profile or self.myself.creator != profile.get('emailAddress'):
-            return False
+        gm = gmail.GMail(self.myself, self.config, self.auth)
+        gm.get_profile()
         self.myself.set_property('email', self.myself.creator)
-        self.myself.set_property('messagesTotal', str(profile.get('messagesTotal')))
-        self.myself.set_property('threadsTotal', str(profile.get('threadsTotal')))
-        self.myself.set_property('historyId', str(profile.get('historyId')))
         return True
 
     def actions_on_oauth_success(self):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE
-        # Format is projects/{project}/topics/{topic}
-        # Create new Google pub/sub topic
-        name = 'projects/proud-structure-220107/topics/mail-' + self.myself.id
-        res = self.auth.oauth_put('https://pubsub.googleapis.com/v1/' + name)
-        if not res and not self.auth.oauth.last_response_code == 409:
-            logging.warning('Not able to create Google pub/sub topic ' + name)
-            return False
-        sub = 'projects/proud-structure-220107/subscriptions/mail-' + self.myself.id
-        # New subscriptiom
-        params = {
-          "topic": name,
-          "pushConfig": {
-            "pushEndpoint": self.config.root + self.myself.id + '/callbacks/messages'
-          },
-          "ackDeadlineSeconds": 10,
-          "retainAckedMessages": False
-        }
-        res = self.auth.oauth_put('https://pubsub.googleapis.com/v1/' + sub, params=params)
-        if not res and not self.auth.oauth.last_response_code == 409:
-            logging.warning('Not able to create Google pub/sub subscription ' + sub)
-            return False
-        # Allow gmail to publish to the topic
-        params = {
-          "policy": {
-            "bindings": [{
-              "role": "roles/pubsub.publisher",
-              "members": ["serviceAccount:gmail-api-push@system.gserviceaccount.com"],
-            }],
-          }
-        }
-        res = self.auth.oauth_post('https://pubsub.googleapis.com/v1/' + name + ':setIamPolicy', params=params)
-        if not res and not self.auth.oauth.last_response_code == 409:
-            logging.warning('Not able to add gmail publish permission on ' + name)
-            return False
-        params = {
-          "topicName": name
-        }
-        res = self.auth.oauth_post('https://www.googleapis.com/gmail/v1/users/me/watch', params=params)
-        if not res and not self.auth.oauth.last_response_code == 409:
-            logging.warning('Not able to create gmail watch')
-            return False
-        return True
+        gm = gmail.GMail(self.myself, self.config, self.auth)
+        gm.set_up()
+        return gm.all_ok()
 
     def get_resources(self, name):
         """ Called on GET to resources. Return struct for json out.
