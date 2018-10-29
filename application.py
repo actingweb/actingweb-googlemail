@@ -265,7 +265,7 @@ def app_root():
             existing = actor.Actor(config=get_config())
             existing.get_from_property('email', request.values.get('creator'))
             if existing.id:
-                return redirect(get_config().root + existing.id, 302)
+                return redirect(get_config().root + existing.id + '/www?refresh=true', 302)
     if request.method == 'GET':
         return render_template('aw-root-factory.html', **h.webobj.response.template_values)
     return h.get_response()

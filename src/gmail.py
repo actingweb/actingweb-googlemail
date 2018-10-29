@@ -142,12 +142,17 @@ class GMail:
         return True
 
     def get_message(self, id=None):
-        return {}
+        if not id:
+            return {}
+        res = self.auth.oauth_get(GMAIL_URL + 'me/messages/' + str(id) + '?format=metadata')
+        if not res or 'id' not in res:
+            return {}
+        return res
 
     def get_history(self, id=0):
         if id == 0:
             id = self.historyId
-        url = GMAIL_URL + 'me/history?startHistoryId=' + str(id)
+        url = GMAIL_URL + 'me/history?startHistoryId=' + str(self.historyId)
         res = self.auth.oauth_get(url)
         logging.debug('Got history: ' + json.dumps(res))
         if not res or not res.get('history'):
@@ -156,7 +161,8 @@ class GMail:
         history_id = res.get('historyId')
         nextToken = res.get('nextPageToken')
         while nextToken:
-            res = self.auth.oauth_get(GMAIL_URL + 'me/history?startHistoryId=' + str(id))
+            res = self.auth.oauth_get(GMAIL_URL + 'me/history?startHistoryId=' + str(self.historyId) +
+                                      '&pageToken=' + nextToken)
             logging.debug('Got history: ' + json.dumps(res))
             if not res or not res.get('history'):
                 nextToken = None
@@ -164,18 +170,25 @@ class GMail:
             nextToken = res.get('nextPageToken')
         if history_id:
             self.myself.set_property('historyId', str(history_id))
+            self.historyId = history_id
         msgs = {}
         # We have a series of history records
         for h in history:
             # Each history record we can have a series of change types
             for k, v in h.items():
-                if k not in ('labelsAdded', 'labelsRemoved', 'messagesAdded', 'messagesDeleted'):
-                    if k in 'messages':
-                        for i in v:
-                            msgs[i['id']] = {
-                                'thread': i['threadId']
-                            }
+                # Skip list of all messages
+                if k in 'messages':
                     continue
+                # Only pick up new messages
+                if k not in 'messagesAdded':
+                    continue
+                # if k not in ('labelsAdded', 'labelsRemoved', 'messagesAdded', 'messagesDeleted'):
+                    # if k in 'messages':
+                    #     for i in v:
+                    #         msgs[i['id']] = {
+                    #             'thread': i['threadId']
+                    #         }
+                    # continue
                 # For each change type, there may be multiple messages
                 for i in v:
                     msgs[i['message']['id']] = {
@@ -190,7 +203,7 @@ class GMail:
     def process_callback(self, data=None):
         if not data or not data.get('message',{}).get('data', None):
             return False
-        msg = data.get('message',{}).get('data', '').encode('utf-8')
+        msg = data.get('message', {}).get('data', '').encode('utf-8')
         try:
             payload = json.loads(base64.b64decode(msg).decode('utf-8'))
         except json.JSONDecodeError:
