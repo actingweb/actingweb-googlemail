@@ -2,7 +2,7 @@
   <body>
 
     {% for k,v in properties.items() %}
-	{{ k }}: {{ v }} <a href="/{{ id }}/properties/{{ k }}?_method=DELETE">Delete</a><br>
+	{{ k }}: {{ v }} <a href="{{ url }}properties/{{ k }}?_method=DELETE">Delete</a><br>
     {% endfor %}
 
   </body>

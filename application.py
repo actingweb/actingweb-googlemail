@@ -22,7 +22,7 @@ OBJ_ON_AW = on_aw.OnAWDemo()
 def get_config():
     myurl = os.getenv('APP_HOST_FQDN', "greger.ngrok.io")
     proto = os.getenv('APP_HOST_PROTOCOL', "https://")
-    aw_type = "urn:actingweb:actingweb.org:googlemail"
+    aw_type = "urn:actingweb:apps.actingweb.io:googlemail"
     bot_token = os.getenv('APP_BOT_TOKEN', "")
     bot_email = os.getenv('APP_BOT_EMAIL', "")
     bot_secret = os.getenv('APP_BOT_SECRET', "")
@@ -263,9 +263,11 @@ def app_root():
         return Response(status=404)
     if h.get_status() == 400:
             existing = actor.Actor(config=get_config())
-            existing.get_from_property('email', request.values.get('creator'))
+            existing.get_from_creator(request.values.get('creator'))
             if existing.id:
                 return redirect(get_config().root + existing.id + '/www?refresh=true', 302)
+            else:
+                return render_template('aw-root-failed.html', **h.webobj.response.template_values)
     if request.method == 'GET':
         return render_template('aw-root-factory.html', **h.webobj.response.template_values)
     return h.get_response()

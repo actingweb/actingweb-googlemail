@@ -55,12 +55,16 @@ class OnAWDemo(on_aw.OnAWBase):
 
     def post_callbacks(self, name):
         """Customizible function to handle POST /callbacks"""
-        gm = gmail.GMail(self.myself, self.config, self.auth)
-        try:
-            h = gm.process_callback(json.loads(self.webobj.request.body.decode('utf-8')))
-        except json.JSONDecodeError:
-            return False
-        logging.debug(json.dumps(h, indent=4))
+        if name == 'messages':
+            gm = gmail.GMail(self.myself, self.config, self.auth)
+            try:
+                h = gm.process_callback(json.loads(self.webobj.request.body.decode('utf-8')))
+            except json.JSONDecodeError:
+                return False
+            blob = json.dumps(h)
+            self.myself.set_property('new', blob)
+            self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
+            logging.debug(json.dumps(h, indent=4))
         return True
 
     def post_subscriptions(self, sub, peerid, data):
@@ -89,7 +93,7 @@ class OnAWDemo(on_aw.OnAWBase):
     def actions_on_oauth_success(self):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE
         gm = gmail.GMail(self.myself, self.config, self.auth)
-        gm.set_up()
+        gm.set_up(refresh=True)
         return gm.all_ok()
 
     def get_resources(self, name):

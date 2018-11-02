@@ -1,5 +1,7 @@
 <html>
   <body>
-	This actor was created by {{ creator }} and has passphrase {{ passphrase }}. <a href="/{{ id }}/www/init">Initialize</a>--<a href="/{{ id }}/www/properties">Properties</a>--<a href="/{{ id }}?_method=DELETE">Delete</a><br>
+	This actor was created by {{ creator }} and has passphrase {{ passphrase }}.
+    <a href="init">Initialize</a>--<a href="properties">Properties</a>--
+    <a href="{{ url }}?_method=DELETE">Delete</a><br>
   </body>
 </html>

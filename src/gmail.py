@@ -16,20 +16,58 @@ class GMail:
         self.historyId = me.get_property('historyId').value
         if self.historyId:
             self.historyId = int(self.historyId)
-        self.labels = None
         self.topic = me.get_property('pubsub-topic').value
         self.subscription = me.get_property('pubsub-subscription').value
         self.watch_exp = me.get_property('watch-expiry').value
+        self.myconf = None
+        self.labels = None
         if self.watch_exp:
             self.watch_exp = int(self.watch_exp)
         self.myself = me
         self.config = config
         self.auth = auth
+        self.my_config()
 
-    def set_up(self):
-        if not self._create_pubsub():
+    def my_config(self, **kwargs):
+        dirty = False
+        if not self.myconf:
+            self.myconf = self.myself.get_property('config').value
+            if self.myconf:
+                try:
+                    self.myconf = json.loads(self.myconf)
+                except json.JSONDecodeError:
+                    self.myconf = None
+            if not self.myconf:
+                dirty = True
+                self.myconf = {
+                    'msgHeaders': [
+                        'To',
+                        'From',
+                        'Subject',
+                        'Return-Path'
+                        'Thread-Topic',
+                        'Thread-Index',
+                        'Date',
+                        'Content-Language',
+                        'Content-Type'
+                    ],
+                    'watchLabels': None,
+                    'msgFormat': 'metadata'   # ('metadata', 'full', 'raw', 'minimal')
+                }
+        if kwargs:
+            for k, v in kwargs.items():
+                if k == 'msgFormat' and v not in ('metadata', 'full', 'raw', 'minimal'):
+                    continue
+                dirty = True
+                self.myconf[k] = v
+        self.labels = self.myconf.get('watchLabels', None)
+        if dirty:
+            self.myself.set_property('config', json.dumps(self.myconf))
+
+    def set_up(self, refresh=False):
+        if not self._create_pubsub(refresh=refresh):
             return False
-        if not self.create_watch():
+        if not self.create_watch(refresh=refresh):
             return False
 
     def all_ok(self):
@@ -45,7 +83,7 @@ class GMail:
         return True
 
     def get_profile(self):
-        profile = self.auth.oauth_get('https://www.googleapis.com/gmail/v1/users/me/profile')
+        profile = self.auth.oauth_get(GMAIL_URL + 'me/profile')
         if not profile or self.myself.creator != profile.get('emailAddress'):
             return False
         self.myself.set_property('messagesTotal', str(profile.get('messagesTotal')))
@@ -70,8 +108,8 @@ class GMail:
         return True
 
     def _create_pubsub(self, refresh=False):
+        name = 'projects/' + GMAIL_PROJECT + '/topics/mail-' + self.myself.id
         if not self.topic or refresh:
-            name = 'projects/'+ GMAIL_PROJECT + '/topics/mail-' + self.myself.id
             res = self.auth.oauth_put(PUBSUB_URL + name)
             if not res and not self.auth.oauth.last_response_code == 409:
                 logging.warning('Not able to create Google pub/sub topic ' + name)
@@ -127,7 +165,7 @@ class GMail:
             }
             if labels:
                 params['labelIds'] = labels
-                self.labels = labels
+                self.my_config(watchLabels=labels)
                 params['labelFilterAction'] = 'include'
             res = self.auth.oauth_post(GMAIL_URL + 'me/watch', params=params)
             if not res and not self.auth.oauth.last_response_code == 409:
@@ -141,33 +179,45 @@ class GMail:
                 self.myself.set_property('historyId', str(self.historyId))
         return True
 
-    def get_message(self, id=None):
+    def get_message(self, id=None, fmt=None):
+        """
+        Retrieve a specific message from Gmail with id.
+        :param id: Gmail message id
+        :param fmt: string ('metadata', 'full', 'raw', 'minimal')
+        :return: Dict of message data from Gmail or empty dict
+        """
         if not id:
             return {}
-        res = self.auth.oauth_get(GMAIL_URL + 'me/messages/' + str(id) + '?format=metadata')
+        if not fmt:
+            fmt = self.myconf.get('msgFormat', 'metadata')
+        res = self.auth.oauth_get(GMAIL_URL + 'me/messages/' + str(id) + '?format=' + fmt)
         if not res or 'id' not in res:
             return {}
+        headers = res.get('payload', {}).get('headers', [])
+        res['payload']['headers'] = []
+        for h in headers:
+            if h.get('name') in self.myconf.get('msgHeaders', []):
+                res['payload']['headers'].append(h)
         return res
 
-    def get_history(self, id=0):
-        if id == 0:
-            id = self.historyId
-        url = GMAIL_URL + 'me/history?startHistoryId=' + str(self.historyId)
+    def get_history(self):
+        url = GMAIL_URL + 'me/history?historyTypes=messageAdded&startHistoryId=' + str(self.historyId)
         res = self.auth.oauth_get(url)
         logging.debug('Got history: ' + json.dumps(res))
         if not res or not res.get('history'):
             return []
         history = res.get('history')
         history_id = res.get('historyId')
-        nextToken = res.get('nextPageToken')
-        while nextToken:
-            res = self.auth.oauth_get(GMAIL_URL + 'me/history?startHistoryId=' + str(self.historyId) +
-                                      '&pageToken=' + nextToken)
+        next_token = res.get('nextPageToken')
+        while next_token:
+            res = self.auth.oauth_get(GMAIL_URL + 'me/history?historyTypes=messageAdded&startHistoryId=' +
+                                      str(self.historyId) + '&pageToken=' + next_token)
             logging.debug('Got history: ' + json.dumps(res))
             if not res or not res.get('history'):
-                nextToken = None
-            history.append(res.get('history'))
-            nextToken = res.get('nextPageToken')
+                next_token = None
+            else:
+                history.append(res.get('history'))
+                next_token = res.get('nextPageToken')
         if history_id:
             self.myself.set_property('historyId', str(history_id))
             self.historyId = history_id
@@ -176,32 +226,28 @@ class GMail:
         for h in history:
             # Each history record we can have a series of change types
             for k, v in h.items():
-                # Skip list of all messages
-                if k in 'messages':
-                    continue
                 # Only pick up new messages
-                if k not in 'messagesAdded':
+                if k != 'messagesAdded':
                     continue
-                # if k not in ('labelsAdded', 'labelsRemoved', 'messagesAdded', 'messagesDeleted'):
-                    # if k in 'messages':
-                    #     for i in v:
-                    #         msgs[i['id']] = {
-                    #             'thread': i['threadId']
-                    #         }
-                    # continue
-                # For each change type, there may be multiple messages
+                # There may be multiple messages
                 for i in v:
-                    msgs[i['message']['id']] = {
-                        'thread': i['message']['threadId'],
-                        'labels': i['message']['labelIds']
-                    }
-        # Add full messages
+                    found = False
+                    if not self.myconf.get('watchLabels'):
+                        found = True
+                    else:
+                        for l in i['message']['labelIds']:
+                            if l in self.myconf.get('watchLabels'):
+                                found = True
+                            break
+                    if found:
+                        msgs[i['message']['id']] = {}
+        # Add message data
         for k, v in msgs.items():
-            msgs[k]['message'] = self.get_message(k)
+            msgs[k] = self.get_message(k)
         return msgs
 
     def process_callback(self, data=None):
-        if not data or not data.get('message',{}).get('data', None):
+        if not data or not data.get('message', {}).get('data', None):
             return False
         msg = data.get('message', {}).get('data', '').encode('utf-8')
         try:
@@ -211,5 +257,8 @@ class GMail:
         if not payload or not payload.get('historyId', None):
             return False
         newId = int(payload.get('historyId'))
-        history = self.get_history(newId)
+        if newId > self.historyId:
+            history = self.get_history()
+        else:
+            history = {}
         return history
