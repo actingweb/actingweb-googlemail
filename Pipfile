@@ -12,8 +12,9 @@ name = "pypitest"
 Jinja2 = "*"
 Flask = "*"
 uWSGI = "*"
-#actingweb = {version="*", index="pypitest"}
-actingweb = "*"
+#actingweb = {path = "./../actingweb", editable = true}
+actingweb = {version="*", index="pypitest"}
+#actingweb = "*"
 
 [dev-packages]
 pydevd = "*"

@@ -61,10 +61,11 @@ class OnAWDemo(on_aw.OnAWBase):
                 h = gm.process_callback(json.loads(self.webobj.request.body.decode('utf-8')))
             except json.JSONDecodeError:
                 return False
-            blob = json.dumps(h)
-            self.myself.set_property('new', blob)
-            self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
-            logging.debug(json.dumps(h, indent=4))
+            logging.debug('Processed google callback: ' + json.dumps(h, indent=4))
+            if h:
+                blob = json.dumps(h)
+                self.myself.set_property('new', blob)
+                self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
         return True
 
     def post_subscriptions(self, sub, peerid, data):

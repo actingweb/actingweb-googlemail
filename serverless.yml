@@ -13,7 +13,7 @@ custom:
     packRequirements: false
   pythonRequirements:
     dockerizePip: non-linux
-  db_prefix: googemail_dev
+  db_prefix: googlemail_dev
   customDomain:
     domainName: apps.actingweb.io
     stage: dev

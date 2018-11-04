@@ -193,11 +193,16 @@ class GMail:
         res = self.auth.oauth_get(GMAIL_URL + 'me/messages/' + str(id) + '?format=' + fmt)
         if not res or 'id' not in res:
             return {}
-        headers = res.get('payload', {}).get('headers', [])
-        res['payload']['headers'] = []
-        for h in headers:
-            if h.get('name') in self.myconf.get('msgHeaders', []):
-                res['payload']['headers'].append(h)
+        if 'payload' in res and 'headers' in res['payload']:
+            hs = {}
+            for h in res['payload']['headers']:
+                name = h.get('name')
+                if name in self.myconf.get('msgHeaders', []):
+                    if name not in hs:
+                        hs[name] = []
+                    hs[name].append(h.get('value'))
+            res['headers'] = hs
+            del res['payload']
         return res
 
     def get_history(self):
