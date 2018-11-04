@@ -20,7 +20,6 @@ class GMail:
         self.subscription = me.get_property('pubsub-subscription').value
         self.watch_exp = me.get_property('watch-expiry').value
         self.myconf = None
-        self.labels = None
         if self.watch_exp:
             self.watch_exp = int(self.watch_exp)
         self.myself = me
@@ -37,10 +36,12 @@ class GMail:
                     self.myconf = json.loads(self.myconf)
                 except json.JSONDecodeError:
                     self.myconf = None
-            if not self.myconf:
+            else:
                 dirty = True
-                self.myconf = {
-                    'msgHeaders': [
+                self.myconf = {}
+            if not self.myconf.get('msgHeaders'):
+                dirty = True
+                self.myconf['msgHeaders'] = [
                         'To',
                         'From',
                         'Subject',
@@ -50,17 +51,22 @@ class GMail:
                         'Date',
                         'Content-Language',
                         'Content-Type'
-                    ],
-                    'watchLabels': None,
-                    'msgFormat': 'metadata'   # ('metadata', 'full', 'raw', 'minimal')
-                }
+                ]
+            if self.myconf.get('watchLabels', None) is None:
+                dirty = True
+                self.myconf['watchLabels'] = []
+            if self.myconf.get('nonWatchLabels', None) is None:
+                dirty = True
+                self.myconf['nonWatchLabels'] = ['SENT', 'DRAFT']
+            if self.myconf.get('msgFormat', None) is None:
+                dirty = True
+                self.myconf['msgFormat'] = 'metadata'   # ('metadata', 'full', 'raw', 'minimal')
         if kwargs:
             for k, v in kwargs.items():
                 if k == 'msgFormat' and v not in ('metadata', 'full', 'raw', 'minimal'):
                     continue
                 dirty = True
                 self.myconf[k] = v
-        self.labels = self.myconf.get('watchLabels', None)
         if dirty:
             self.myself.set_property('config', json.dumps(self.myconf))
 
@@ -243,6 +249,11 @@ class GMail:
                         for l in i['message']['labelIds']:
                             if l in self.myconf.get('watchLabels'):
                                 found = True
+                            break
+                    if self.myconf.get('nonWatchLabels'):
+                        for l in i['message']['labelIds']:
+                            if l in self.myconf.get('nonWatchLabels'):
+                                found = False
                             break
                     if found:
                         msgs[i['message']['id']] = {}
