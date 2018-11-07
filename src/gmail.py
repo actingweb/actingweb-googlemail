@@ -45,7 +45,7 @@ class GMail:
                         'To',
                         'From',
                         'Subject',
-                        'Return-Path'
+                        'Return-Path',
                         'Thread-Topic',
                         'Thread-Index',
                         'Date',
