@@ -3,6 +3,24 @@ import json
 from actingweb import on_aw
 from src import gmail
 
+PROP_HIDE = [
+    "oauth_refresh_token",
+    "oauth_refresh_token_expiry",
+    "oauth_token",
+    "oauth_token_expiry",
+    "pubsub-subscription",
+    "pubsub-topic",
+    "watch-expiry"
+]
+
+PROP_PROTECT = PROP_HIDE + [
+    "email",
+    "new",
+    "historyId",
+    "messagesTotal",
+    "threadsTotal"
+]
+
 
 class OnAWDemo(on_aw.OnAWBase):
 
@@ -43,6 +61,77 @@ class OnAWDemo(on_aw.OnAWBase):
         #    return True
         # Do something
         return True
+
+    def get_properties(self, path: list, data: dict) -> dict or None:
+        """ Called on GET to properties for transformations to be done
+        :param path: Target path requested
+        :type path: list[str]
+        :param data: Data retrieved from data store to be returned
+        :type data: dict
+        :return: The transformed data to return to requestor or None if 404 should be returned
+        :rtype: dict or None
+        """
+        if not path:
+            for k, v in data.copy().items():
+                if k in PROP_HIDE:
+                    del data[k]
+        elif len(path) > 0 and path[0] in PROP_HIDE:
+            return None
+        return data
+
+    def delete_properties(self, path: list, old: dict, new: dict) -> bool:
+        """ Called on DELETE to properties
+        :param path: Target path to be deleted
+        :type path: list[str]
+        :param old: Property value that will be deleted (or changed)
+        :type old: dict
+        :param new: Property value after path has been deleted
+        :type new: dict
+        :return: True if DELETE is allowed, False if 403 should be returned
+        :rtype: bool
+        """
+        if not path:
+            return False
+        elif len(path) > 0 and path[0] in PROP_PROTECT:
+            return False
+        return True
+
+    def put_properties(self, path: list, old: dict, new: dict) -> dict or None:
+        """ Called on PUT to properties for transformations to be done before save
+        :param path: Target path requested to be updated
+        :type path: list[str]
+        :param old: Old data from database
+        :type old: dict
+        :param new:
+        :type new: New data from PUT request (after merge)
+        :return: The dict that should be stored or None if 400 should be returned and nothing stored
+        :rtype: dict or None
+        """
+        if not path:
+            return None
+        elif len(path) > 0 and path[0] in PROP_PROTECT:
+            return None
+        if path and len(path) >= 1 and path[0] == 'config':
+            if 'watchLabels' in new:
+                newlabels = new['watchLabels']
+                gm = gmail.GMail(self.myself, self.config, self.auth)
+                gm.create_watch(labels=newlabels, refresh=True)
+        return new
+
+    def post_properties(self, prop: str, data: dict) -> dict or None:
+        """ Called on POST to properties, once for each property
+        :param prop: Property to be created
+        :type prop: str
+        :param data: The data to be stored in prop
+        :type data: dict
+        :return: The transformed data to store in prop or None if that property should be skipped and not stored
+        :rtype: dict or None
+        """
+        if not prop:
+            return None
+        elif prop in PROP_PROTECT:
+            return None
+        return data
 
     def get_callbacks(self, name):
         """Customizible function to handle GET /callbacks"""
