@@ -3,18 +3,9 @@ import json
 from actingweb import on_aw
 from src import gmail
 
-PROP_HIDE = [
-    "oauth_refresh_token",
-    "oauth_refresh_token_expiry",
-    "oauth_token",
-    "oauth_token_expiry",
-    "pubsub-subscription",
-    "pubsub-topic",
-    "watch-expiry"
-]
+PROP_HIDE = []
 
 PROP_PROTECT = PROP_HIDE + [
-    "email",
     "new",
     "historyId",
     "messagesTotal",
@@ -177,7 +168,6 @@ class OnAWDemo(on_aw.OnAWBase):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE AND BEFORE APPROVAL
         gm = gmail.GMail(self.myself, self.config, self.auth)
         gm.get_profile()
-        self.myself.set_property('email', self.myself.creator)
         return True
 
     def actions_on_oauth_success(self):

@@ -16,9 +16,9 @@ class GMail:
         self.historyId = me.get_property('historyId').value
         if self.historyId:
             self.historyId = int(self.historyId)
-        self.topic = me.get_property('pubsub-topic').value
-        self.subscription = me.get_property('pubsub-subscription').value
-        self.watch_exp = me.get_property('watch-expiry').value
+        self.topic = me.store.pubsub_topic
+        self.subscription = me.store.pubsub_subscription
+        self.watch_exp = me.store.watch_expiry
         self.myconf = None
         if self.watch_exp:
             self.watch_exp = int(self.watch_exp)
@@ -133,7 +133,7 @@ class GMail:
             if not res and not self.auth.oauth.last_response_code == 409:
                 logging.warning('Not able to add gmail publish permission on ' + name)
                 return False
-            self.myself.set_property('pubsub-topic', name)
+            self.myself.store.pubsub_topic = name
             self.topic = name
         if not self.subscription or refresh:
             sub = 'projects/' + GMAIL_PROJECT + '/subscriptions/mail-' + self.myself.id
@@ -150,7 +150,7 @@ class GMail:
             if not res and not self.auth.oauth.last_response_code == 409:
                 logging.warning('Not able to create Google pub/sub subscription ' + sub)
                 return False
-            self.myself.set_property('pubsub-subscription', sub)
+            self.myself.store.pubsub_subscription = sub
             self.subscription = sub
         return True
 
@@ -159,7 +159,7 @@ class GMail:
         if 199 > self.auth.oauth.last_response_code > 299 and self.auth.oauth.last_response_code != 404:
             logging.warning('Not able to stop gmail watch')
             return False
-        self.myself.delete_property('watch-expiry')
+        self.myself.store.watch_expiry = None
         self.watch_exp = None
         return True
 
@@ -180,7 +180,7 @@ class GMail:
             self.watch_exp = res.get('expiration', None)
             self.historyId = res.get('historyId', None)
             if self.watch_exp:
-                self.myself.set_property('watch-expiry', str(self.watch_exp))
+                self.myself.store.watch_expiry = str(self.watch_exp)
             if self.historyId:
                 self.myself.set_property('historyId', str(self.historyId))
         return True
