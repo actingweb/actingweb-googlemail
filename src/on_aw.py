@@ -81,9 +81,7 @@ class OnAWDemo(on_aw.OnAWBase):
         :return: True if DELETE is allowed, False if 403 should be returned
         :rtype: bool
         """
-        if not path:
-            return False
-        elif len(path) > 0 and path[0] in PROP_PROTECT:
+        if len(path) > 0 and path[0] in PROP_PROTECT:
             return False
         return True
 
@@ -104,9 +102,9 @@ class OnAWDemo(on_aw.OnAWBase):
             return None
         if path and len(path) >= 1 and path[0] == 'config':
             if 'watchLabels' in new:
-                newlabels = new['watchLabels']
+                new_labels = new['watchLabels']
                 gm = gmail.GMail(self.myself, self.config, self.auth)
-                gm.create_watch(labels=newlabels, refresh=True)
+                gm.create_watch(labels=new_labels, refresh=True)
         return new
 
     def post_properties(self, prop: str, data: dict) -> dict or None:
@@ -144,7 +142,7 @@ class OnAWDemo(on_aw.OnAWBase):
             logging.debug('Processed google callback: ' + json.dumps(h, indent=4))
             if h:
                 blob = json.dumps(h)
-                self.myself.set_property('new', blob)
+                self.myself.property.new = blob
                 self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
         return True
 

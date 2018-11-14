@@ -13,9 +13,9 @@ class GMail:
     def __init__(self, me=None, config=None, auth=None):
         if not me or not config or not auth:
             return
-        self.historyId = me.get_property('historyId').value
-        if self.historyId:
-            self.historyId = int(self.historyId)
+        self.history_id = me.property.historyId
+        if self.history_id:
+            self.history_id = int(self.history_id)
         self.topic = me.store.pubsub_topic
         self.subscription = me.store.pubsub_subscription
         self.watch_exp = me.store.watch_expiry
@@ -30,12 +30,12 @@ class GMail:
     def my_config(self, **kwargs):
         dirty = False
         if not self.myconf:
-            self.myconf = self.myself.get_property('config').value
+            self.myconf = self.myself.property.config
             if self.myconf:
                 try:
                     self.myconf = json.loads(self.myconf)
                 except json.JSONDecodeError:
-                    self.myconf = None
+                    self.myconf = {}
             else:
                 dirty = True
                 self.myconf = {}
@@ -68,7 +68,7 @@ class GMail:
                 dirty = True
                 self.myconf[k] = v
         if dirty:
-            self.myself.set_property('config', json.dumps(self.myconf))
+            self.myself.property.config = json.dumps(self.myconf)
 
     def set_up(self, refresh=False):
         if not self._create_pubsub(refresh=refresh):
@@ -77,7 +77,7 @@ class GMail:
             return False
 
     def all_ok(self):
-        if self.watch_exp and self.topic and self.subscription and self.historyId:
+        if self.watch_exp and self.topic and self.subscription and self.history_id:
             return True
         return False
 
@@ -92,12 +92,12 @@ class GMail:
         profile = self.auth.oauth_get(GMAIL_URL + 'me/profile')
         if not profile or self.myself.creator != profile.get('emailAddress'):
             return False
-        self.myself.set_property('messagesTotal', str(profile.get('messagesTotal')))
-        self.myself.set_property('threadsTotal', str(profile.get('threadsTotal')))
-        self.myself.set_property('historyId', str(profile.get('historyId')))
-        self.historyId = profile.get('historyId')
-        if self.historyId:
-            self.historyId = int(self.historyId)
+        self.myself.property.messagesTotal = str(profile.get('messagesTotal'))
+        self.myself.property.threadsTotal = str(profile.get('threadsTotal'))
+        self.myself.property.historyId = str(profile.get('historyId'))
+        self.history_id = profile.get('historyId')
+        if self.history_id:
+            self.history_id = int(self.history_id)
         return True
 
     def _delete_pubsub(self):
@@ -156,7 +156,7 @@ class GMail:
 
     def _stop_watch(self):
         self.auth.oauth_post(GMAIL_URL + 'me/stop')
-        if 199 > self.auth.oauth.last_response_code > 299 and self.auth.oauth.last_response_code != 404:
+        if (299 < self.auth.oauth.last_response_code < 199) and self.auth.oauth.last_response_code != 404:
             logging.warning('Not able to stop gmail watch')
             return False
         self.myself.store.watch_expiry = None
@@ -178,11 +178,11 @@ class GMail:
                 logging.warning('Not able to create gmail watch')
                 return False
             self.watch_exp = res.get('expiration', None)
-            self.historyId = res.get('historyId', None)
+            self.history_id = res.get('historyId', None)
             if self.watch_exp:
                 self.myself.store.watch_expiry = str(self.watch_exp)
-            if self.historyId:
-                self.myself.set_property('historyId', str(self.historyId))
+            if self.history_id:
+                self.myself.property.historyId = str(self.history_id)
         return True
 
     def get_message(self, id=None, fmt=None):
@@ -212,7 +212,7 @@ class GMail:
         return res
 
     def get_history(self):
-        url = GMAIL_URL + 'me/history?historyTypes=messageAdded&startHistoryId=' + str(self.historyId)
+        url = GMAIL_URL + 'me/history?historyTypes=messageAdded&startHistoryId=' + str(self.history_id)
         res = self.auth.oauth_get(url)
         logging.debug('Got history: ' + json.dumps(res))
         if not res or not res.get('history'):
@@ -222,7 +222,7 @@ class GMail:
         next_token = res.get('nextPageToken')
         while next_token:
             res = self.auth.oauth_get(GMAIL_URL + 'me/history?historyTypes=messageAdded&startHistoryId=' +
-                                      str(self.historyId) + '&pageToken=' + next_token)
+                                      str(self.history_id) + '&pageToken=' + next_token)
             logging.debug('Got history: ' + json.dumps(res))
             if not res or not res.get('history'):
                 next_token = None
@@ -230,8 +230,8 @@ class GMail:
                 history.append(res.get('history'))
                 next_token = res.get('nextPageToken')
         if history_id:
-            self.myself.set_property('historyId', str(history_id))
-            self.historyId = history_id
+            self.myself.property.historyId = str(history_id)
+            self.history_id = history_id
         msgs = {}
         # We have a series of history records
         for h in history:
@@ -272,8 +272,8 @@ class GMail:
             return False
         if not payload or not payload.get('historyId', None):
             return False
-        newId = int(payload.get('historyId'))
-        if newId > self.historyId:
+        new_id = int(payload.get('historyId'))
+        if new_id > self.history_id:
             history = self.get_history()
         else:
             history = {}
