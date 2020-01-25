@@ -144,6 +144,10 @@ class OnAWDemo(on_aw.OnAWBase):
                 blob = json.dumps(h)
                 self.myself.property.new = blob
                 self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
+            now = time.time()
+            if not gm.watch_exp or now > gm.watch_exp - (24 * 3600):
+                logging.debug('Less than 24h to gmail watch expiry, refreshing...')
+                gm.set_up(refresh=True)
         return True
 
     def post_subscriptions(self, sub, peerid, data):
