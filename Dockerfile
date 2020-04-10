@@ -1,5 +1,4 @@
 FROM python:alpine3.6
-MAINTAINER support@greger.io
 
 RUN addgroup -g 1000 -S uwsgi && \
     adduser -u 1000 -S uwsgi -G uwsgi
@@ -14,6 +13,7 @@ RUN apk update \
     && pip install --upgrade pip && pip install pipenv
 COPY . /src
 RUN pipenv install --system --ignore-pipfile
+RUN pipenv install --system --dev
 RUN apk cache clean
 EXPOSE 5000
 ENTRYPOINT ["/src/run.sh"]

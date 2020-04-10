@@ -24,7 +24,7 @@ custom:
 
 provider:
   name: aws
-  runtime: python3.6
+  runtime: python3.7
   memorySize: 128
   timeout: 30
   stage: ${self:custom.customDomain.stage}
@@ -53,7 +53,7 @@ provider:
 
 functions:
   app:
-    handler: wsgi.handler
+    handler: wsgi_handler.handler
     events:
       - http: ANY /
       - http: 'ANY {proxy+}'

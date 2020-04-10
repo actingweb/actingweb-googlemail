@@ -8,18 +8,27 @@ from actingweb import config, aw_web_request, actor
 from src import on_aw
 from actingweb.handlers import callbacks, properties, meta, root, trust, devtest, \
     subscription, resources, oauth, callback_oauth, bot, www, factory
+# To debug in pycharm inside the Docker container, remember to uncomment import pydevd as well
+# (and add to requirements.txt)
+# import pydevd_pycharm
 
 logging.basicConfig(stream=sys.stderr, level=os.getenv('LOG_LEVEL', "INFO"))
 LOG = logging.getLogger()
 LOG.setLevel(os.getenv('LOG_LEVEL', "INFO"))
 
-app = Flask(__name__, static_url_path='/static')
+app = Flask(__name__, static_url_path='/googlemail/static')
 
 # The on_aw object we will use to do app-specific processing
-OBJ_ON_AW = on_aw.OnAWDemo()
+OBJ_ON_AW = on_aw.OnAWGoogleMail()
 
 
 def get_config():
+    # Having settrace here will make sure the process reconnects to the debug server on each request
+    # which makes it easier to keep in sync when doing code changes
+    # pydevd_pycharm.settrace('docker.for.mac.localhost', port=3001, stdoutToServer=True, stderrToServer=True,
+    #                        suspend=False)
+    #
+    # The greger.ngrok.io address will be overriden by env variables from serverless.yml
     myurl = os.getenv('APP_HOST_FQDN', "greger.ngrok.io")
     proto = os.getenv('APP_HOST_PROTOCOL', "https://")
     aw_type = "urn:actingweb:apps.actingweb.io:googlemail"
@@ -262,12 +271,12 @@ def app_root():
     if not h.process():
         return Response(status=404)
     if h.get_status() == 400:
-            existing = actor.Actor(config=get_config())
-            existing.get_from_creator(request.values.get('creator'))
-            if existing.id:
-                return redirect(get_config().root + existing.id + '/www?refresh=true', 302)
-            else:
-                return render_template('aw-root-failed.html', **h.webobj.response.template_values)
+        existing = actor.Actor(config=get_config())
+        existing.get_from_creator(request.values.get('creator'))
+        if existing.id:
+            return redirect(get_config().root + existing.id + '/www?refresh=true', 302)
+        else:
+            return render_template('aw-root-failed.html', **h.webobj.response.template_values)
     if request.method == 'GET':
         return render_template('aw-root-factory.html', **h.webobj.response.template_values)
     return h.get_response()
@@ -307,6 +316,8 @@ def app_www(actor_id, path=''):
         return Response(status=404)
     if h.get_redirect():
         return h.get_redirect()
+    if h.webobj.response.status_code == 403:
+        return Response(status=403)
     if request.method == 'GET':
         if not path or path == '':
             return render_template('aw-actor-www-root.html', **h.webobj.response.template_values)
@@ -417,11 +428,6 @@ def app_google_verify():
 
 
 if __name__ == "__main__":
-    # To debug in pycharm inside the Docker container, remember to uncomment import pydevd as well
-    # (and add to requirements.txt)
-    # import pydevd
-    # pydevd.settrace('docker.for.mac.localhost', port=3001, stdoutToServer=True, stderrToServer=True)
-
     logging.debug('Starting up the Google mail actor ...')
     # Only for debugging while developing
     app.run(host='0.0.0.0', debug=True, port=5000)

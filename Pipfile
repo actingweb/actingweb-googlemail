@@ -17,7 +17,7 @@ uWSGI = "*"
 actingweb = "*"
 
 [dev-packages]
-pydevd = "*"
+pydevd-pycharm = "*"
 
 [requires]
 python_version = "3.6"

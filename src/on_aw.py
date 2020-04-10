@@ -1,5 +1,6 @@
 import logging
 import json
+import time
 from actingweb import on_aw
 from src import gmail
 
@@ -13,7 +14,7 @@ PROP_PROTECT = PROP_HIDE + [
 ]
 
 
-class OnAWDemo(on_aw.OnAWBase):
+class OnAWGoogleMail(on_aw.OnAWBase):
 
     def bot_post(self, path):
         """Called on POSTs to /bot.
