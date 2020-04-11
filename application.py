@@ -40,7 +40,7 @@ def get_config():
         'client_id': os.getenv('APP_OAUTH_ID', ""),
         'client_secret': os.getenv('APP_OAUTH_KEY', ""),
         'redirect_uri': proto + myurl + "/oauth",
-        'scope': "https://mail.google.com/ https://www.googleapis.com/auth/pubsub",
+        'scope': "https://www.googleapis.com/auth/gmail.readonly",
         'auth_uri': "https://accounts.google.com/o/oauth2/v2/auth",
         'token_uri': "https://www.googleapis.com/oauth2/v4/token",
         'response_type': "code",
@@ -48,7 +48,7 @@ def get_config():
         'refresh_type': "refresh_token",
         'oauth_extras': {
             'access_type': 'offline',
-            'include_granted_scopes': 'true',
+            'include_granted_scopes': 'false',
             'login_hint': 'dynamic:creator',
             'prompt': 'consent'
         }

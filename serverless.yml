@@ -35,8 +35,7 @@ provider:
     APP_HOST_PROTOCOL: 'https://'
     LOG_LEVEL: 'DEBUG'
     AWS_DB_PREFIX: ${self:custom.db_prefix}
-    APP_OAUTH_ID: ''
-    APP_OAUTH_KEY: ''
+    GOOGLE_APPLICATION_CREDENTIALS: './service-account.json'
   iamRoleStatements:
     - Effect: Allow
       Action:

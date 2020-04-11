@@ -2,6 +2,8 @@ import logging
 import time
 import base64
 import json
+from google.cloud import pubsub_v1 as pubsub
+from google.api_core import exceptions as google_exceptions
 
 GMAIL_URL = "https://www.googleapis.com/gmail/v1/users/"
 PUBSUB_URL = "https://pubsub.googleapis.com/v1/"
@@ -102,52 +104,64 @@ class GMail:
 
     def _delete_pubsub(self):
         if self.subscription:
-            self.auth.oauth_delete(PUBSUB_URL + self.subscription)
-            if 199 > self.auth.oauth.last_response_code > 299:
+            client = pubsub.SubscriberClient()
+            sub = client.subscription_path(GMAIL_PROJECT, self.subscription)
+            try:
+                client.delete_subscription(sub)
+            except:
                 logging.warning('Not able to delete pub/sub subscription ' + self.subscription)
                 return False
         if self.topic:
-            self.auth.oauth_delete(PUBSUB_URL + self.topic)
-            if 199 > self.auth.oauth.last_response_code > 299:
+            publisher = pubsub.PublisherClient()
+            topic = publisher.topic_path(GMAIL_PROJECT, self.topic)
+            try:
+                publisher.delete_topic(topic)
+            except:
                 logging.warning('Not able to delete pub/sub topic ' + self.topic)
                 return False
         return True
 
     def _create_pubsub(self, refresh=False):
+        publisher = pubsub.PublisherClient()
         name = 'projects/' + GMAIL_PROJECT + '/topics/mail-' + self.myself.id
         if not self.topic or refresh:
-            res = self.auth.oauth_put(PUBSUB_URL + name)
-            if not res and not self.auth.oauth.last_response_code == 409:
+            try:
+                publisher.create_topic(name)
+            except google_exceptions.AlreadyExists:
+                logging.warning('Existing Google pub/sub topic ' + name)
+            except (ValueError, google_exceptions.GoogleAPICallError):
                 logging.warning('Not able to create Google pub/sub topic ' + name)
                 return False
             # Allow gmail to publish to the topic
-            params = {
-                "policy": {
-                    "bindings": [{
-                        "role": "roles/pubsub.publisher",
-                        "members": ["serviceAccount:gmail-api-push@system.gserviceaccount.com"],
-                    }],
-                }
+            policy = {
+                "bindings": [{
+                    "role": "roles/pubsub.publisher",
+                    "members": ["serviceAccount:gmail-api-push@system.gserviceaccount.com"],
+                }],
             }
-            res = self.auth.oauth_post(PUBSUB_URL + name + ':setIamPolicy', params=params)
-            if not res and not self.auth.oauth.last_response_code == 409:
+            try:
+                response = publisher.set_iam_policy(name, policy)
+            except:
                 logging.warning('Not able to add gmail publish permission on ' + name)
                 return False
             self.myself.store.pubsub_topic = name
             self.topic = name
         if not self.subscription or refresh:
             sub = 'projects/' + GMAIL_PROJECT + '/subscriptions/mail-' + self.myself.id
-            # New subscription
-            params = {
-                "topic": name,
-                "pushConfig": {
-                    "pushEndpoint": self.config.root + self.myself.id + '/callbacks/messages'
-                },
-                "ackDeadlineSeconds": 10,
-                "retainAckedMessages": False
-            }
-            res = self.auth.oauth_put(PUBSUB_URL + sub, params=params)
-            if not res and not self.auth.oauth.last_response_code == 409:
+            client = pubsub.SubscriberClient()
+            try:
+                client.create_subscription(
+                    name=sub,
+                    topic=name,
+                    push_config={
+                        'push_endpoint': self.config.root + self.myself.id + '/callbacks/messages'
+                    },
+                    ack_deadline_seconds=10,
+                    retain_acked_messages=False
+                )
+            except google_exceptions.AlreadyExists:
+                logging.warning('Existing Google subscription ' + sub)
+            except (ValueError, google_exceptions.GoogleAPICallError):
                 logging.warning('Not able to create Google pub/sub subscription ' + sub)
                 return False
             self.myself.store.pubsub_subscription = sub

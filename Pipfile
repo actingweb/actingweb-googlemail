@@ -15,6 +15,7 @@ uWSGI = "*"
 #actingweb = {path = "./../actingweb", editable = true}
 #actingweb = {version="*", index="pypitest"}
 actingweb = "*"
+google-cloud-pubsub = "*"
 
 [dev-packages]
 pydevd-pycharm = "*"
