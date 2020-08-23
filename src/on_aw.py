@@ -146,8 +146,8 @@ class OnAWGoogleMail(on_aw.OnAWBase):
                 self.myself.property.new = blob
                 self.myself.register_diffs(target='properties', subtarget='new', blob=blob)
             now = time.time()
-            if not gm.watch_exp or now > gm.watch_exp - (24 * 3600):
-                logging.debug('Less than 24h to gmail watch expiry, refreshing...')
+            if not gm.watch_exp or now > gm.watch_exp - (3 * 24 * 3600):
+                logging.debug('Less than 3 x 24h to gmail watch expiry, refreshing...')
                 gm.set_up(refresh=True)
         return True
 
