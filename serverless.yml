@@ -2,11 +2,6 @@
 
 service: googlemail
 
-plugins:
-  - serverless-python-requirements
-  - serverless-wsgi
-  - serverless-domain-manager
-  - serverless-pseudo-parameters
 custom:
   wsgi:
     app: application.app
@@ -29,6 +24,7 @@ provider:
   timeout: 30
   stage: ${self:custom.customDomain.stage}
   region: us-west-1
+  lambdaHashingVersion: '20201221'
   environment:
     API_GATEWAY_BASE_PATH: ${self:custom.customDomain.basePath}
     APP_HOST_FQDN: '${self:custom.customDomain.domainName}/${self:custom.customDomain.basePath}'
@@ -36,18 +32,20 @@ provider:
     LOG_LEVEL: 'DEBUG'
     AWS_DB_PREFIX: ${self:custom.db_prefix}
     GOOGLE_APPLICATION_CREDENTIALS: './service-account.json'
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-        - dynamodb:CreateTable
-        - dynamodb:DescribeTable
-      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:custom.db_prefix}_*"
+  iam:
+    role:
+        statements:
+          - Effect: Allow
+            Action:
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:CreateTable
+              - dynamodb:DescribeTable
+            Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:custom.db_prefix}_*"
 
 
 functions:
@@ -55,4 +53,10 @@ functions:
     handler: wsgi_handler.handler
     events:
       - http: ANY /
-      - http: 'ANY {proxy+}'
+      - http: 'ANY /{proxy+}'
+
+plugins:
+  - serverless-python-requirements
+  - serverless-wsgi
+  - serverless-domain-manager
+  - serverless-pseudo-parameters
