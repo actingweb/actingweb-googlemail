@@ -13,8 +13,8 @@ Jinja2 = "2.11.3"
 Flask = "1.1.2"
 uWSGI = "2.0.19.1"
 #actingweb = {path = "./../actingweb", editable = true}
-#actingweb = {version="*", index="pypitest"}
-actingweb = "2.6.4"
+#actingweb = {version="2.6.4.1", index="pypitest"}
+actingweb = "2.6.5"
 google-cloud-pubsub = "2.4.1"
 
 [dev-packages]

@@ -164,8 +164,10 @@ class OnAWGoogleMail(on_aw.OnAWBase):
         # Clean up anything associated with this actor before it is deleted.
         # END OF SAMPLE CODE
         gm = gmail.GMail(self.myself, self.config, self.auth)
-        gm.cleanup()
-        return
+        if gm.cleanup():
+            return True
+        else:
+            return False
 
     def check_on_oauth_success(self, token=None):
         # THIS METHOD IS CALLED WHEN AN OAUTH AUTHORIZATION HAS BEEN SUCCESSFULLY MADE AND BEFORE APPROVAL

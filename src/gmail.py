@@ -6,7 +6,7 @@ from google.cloud import pubsub_v1 as pubsub
 from google.api_core import exceptions as google_exceptions
 
 GMAIL_URL = "https://www.googleapis.com/gmail/v1/users/"
-PUBSUB_URL = "https://pubsub.googleapis.com/v1/"
+# Hardcoded for now
 GMAIL_PROJECT = "proud-structure-220107"
 
 
@@ -105,17 +105,15 @@ class GMail:
     def _delete_pubsub(self):
         if self.subscription:
             client = pubsub.SubscriberClient()
-            sub = client.subscription_path(GMAIL_PROJECT, self.subscription)
             try:
-                client.delete_subscription(sub)
+                client.delete_subscription(request={ "subscription": self.subscription})
             except:
                 logging.warning('Not able to delete pub/sub subscription ' + self.subscription)
                 return False
         if self.topic:
             publisher = pubsub.PublisherClient()
-            topic = publisher.topic_path(GMAIL_PROJECT, self.topic)
             try:
-                publisher.delete_topic(topic)
+                publisher.delete_topic(request={"topic": self.topic})
             except:
                 logging.warning('Not able to delete pub/sub topic ' + self.topic)
                 return False
@@ -126,7 +124,7 @@ class GMail:
         name = 'projects/' + GMAIL_PROJECT + '/topics/mail-' + self.myself.id
         if not self.topic or refresh:
             try:
-                publisher.create_topic(name)
+                publisher.create_topic(request={"name": name})
             except google_exceptions.AlreadyExists:
                 logging.warning('Existing Google pub/sub topic ' + name)
             except (ValueError, google_exceptions.GoogleAPICallError):
@@ -140,7 +138,7 @@ class GMail:
                 }],
             }
             try:
-                response = publisher.set_iam_policy(name, policy)
+                response = publisher.set_iam_policy(request={"resource": name, "policy": policy})
             except:
                 logging.warning('Not able to add gmail publish permission on ' + name)
                 return False
@@ -151,14 +149,15 @@ class GMail:
             client = pubsub.SubscriberClient()
             try:
                 client.create_subscription(
-                    name=sub,
-                    topic=name,
-                    push_config={
-                        'push_endpoint': self.config.root + self.myself.id + '/callbacks/messages'
-                    },
-                    ack_deadline_seconds=10,
-                    retain_acked_messages=False
-                )
+                    request={
+                        "name": sub,
+                        "topic": name,
+                        "push_config": {
+                            "push_endpoint": self.config.root + self.myself.id + "/callbacks/messages"
+                        },
+                        "ack_deadline_seconds": 10,
+                        "retainAckedMessages": False
+                    })
             except google_exceptions.AlreadyExists:
                 logging.warning('Existing Google subscription ' + sub)
             except (ValueError, google_exceptions.GoogleAPICallError):
