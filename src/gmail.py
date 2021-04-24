@@ -156,12 +156,12 @@ class GMail:
                             "push_endpoint": self.config.root + self.myself.id + "/callbacks/messages"
                         },
                         "ack_deadline_seconds": 10,
-                        "retainAckedMessages": False
+                        "retain_acked_messages": False
                     })
             except google_exceptions.AlreadyExists:
                 logging.warning('Existing Google subscription ' + sub)
-            except (ValueError, google_exceptions.GoogleAPICallError):
-                logging.warning('Not able to create Google pub/sub subscription ' + sub)
+            except (ValueError, google_exceptions.GoogleAPICallError) as e:
+                logging.warning('Not able to create Google pub/sub subscription ' + sub + '\n' + e.args[0])
                 return False
             self.myself.store.pubsub_subscription = sub
             self.subscription = sub
